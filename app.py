@@ -2,30 +2,37 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from ctransformers import AutoModelForCausalLM
 import os, json, re, uuid
 from datetime import datetime
-import requests
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
 
+# Глобально инициализируем переменную
 model = None
 
-MODEL_FILE = "/etc/secrets/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-MODEL_TYPE = os.getenv("MODEL_TYPE", "mistral")
-GPU_LAYERS = int(os.getenv("GPU_LAYERS", 0))
+# Путь к модели (Render позволяет положить файл в /etc/secrets при ручной загрузке)
+MODEL_PATH = "/etc/secrets/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+MODEL_TYPE = "mistral"
+GPU_LAYERS = 0
 
-try:
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_FILE,
-        model_type=MODEL_TYPE,
-        gpu_layers=GPU_LAYERS,
-        context_length=2048
-    )
-except Exception as e:
-    print("Ошибка загрузки модели:", e)
-    model = None
-    
 CHATS_DIR = "chats"
 os.makedirs(CHATS_DIR, exist_ok=True)
+
+
+@app.before_first_request
+def load_model():
+    global model
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL_PATH,
+            model_type=MODEL_TYPE,
+            gpu_layers=GPU_LAYERS,
+            context_length=2048
+        )
+        print("Модель загружена.")
+    except Exception as e:
+        print("Ошибка при загрузке модели:", e)
+        model = None
+
 
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format='%d.%m.%Y %H:%M'):
@@ -60,16 +67,16 @@ def generate_response(user_input):
     if not model:
         return "Модель не загружена"
 
-    prompt = f'''Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
+    prompt = f"""Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
 
 Вопрос: {user_input}
-Ответ:'''
+Ответ:"""
 
     try:
         output = model(prompt, max_new_tokens=512, temperature=0.7, top_p=0.9)
         return format_response(output)
     except Exception as e:
-        print(f"Ошибка генерации: {e}")
+        print("Ошибка генерации:", e)
         return "Ошибка генерации"
 
 
