@@ -2,37 +2,41 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from ctransformers import AutoModelForCausalLM
 import os, json, re, uuid
 from datetime import datetime
+import requests
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
 
-# Глобально инициализируем переменную
-model = None
-
-# Путь к модели (Render позволяет положить файл в /etc/secrets при ручной загрузке)
-MODEL_PATH = "/etc/secrets/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-MODEL_TYPE = "mistral"
-GPU_LAYERS = 0
-
 CHATS_DIR = "chats"
 os.makedirs(CHATS_DIR, exist_ok=True)
 
+# === Путь и URL к модели ===
+MODEL_FILE = "mistral-7b.Q4_K_M.gguf"
+MODEL_URL = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
 
-@app.before_first_request
+# === Загрузка модели при необходимости ===
+def download_model_if_needed():
+    if not os.path.exists(MODEL_FILE):
+        print("Скачиваем модель...")
+        with requests.get(MODEL_URL, stream=True) as r:
+            r.raise_for_status()
+            with open(MODEL_FILE, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        print("Модель скачана.")
+    else:
+        print("Модель уже скачана.")
+
+# === Инициализация модели ===
+model = None
 def load_model():
     global model
-    try:
-        model = AutoModelForCausalLM.from_pretrained(
-            MODEL_PATH,
-            model_type=MODEL_TYPE,
-            gpu_layers=GPU_LAYERS,
-            context_length=2048
-        )
-        print("Модель загружена.")
-    except Exception as e:
-        print("Ошибка при загрузке модели:", e)
-        model = None
+    download_model_if_needed()
+    model = AutoModelForCausalLM.from_pretrained(MODEL_FILE, model_type="mistral", gpu_layers=0)
 
+@app.before_first_request
+def init():
+    load_model()
 
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format='%d.%m.%Y %H:%M'):
@@ -41,14 +45,12 @@ def datetimeformat(value, format='%d.%m.%Y %H:%M'):
     except:
         return value
 
-
 def get_chat_history(chat_id):
     path = os.path.join(CHATS_DIR, f"{chat_id}.json")
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return []
-
 
 def save_chat_message(chat_id, user_input, response):
     history = get_chat_history(chat_id)
@@ -62,36 +64,29 @@ def save_chat_message(chat_id, user_input, response):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
 
-
-def generate_response(user_input):
-    if not model:
-        return "Модель не загружена"
-
-    prompt = f"""Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
-
-Вопрос: {user_input}
-Ответ:"""
-
-    try:
-        output = model(prompt, max_new_tokens=512, temperature=0.7, top_p=0.9)
-        return format_response(output)
-    except Exception as e:
-        print("Ошибка генерации:", e)
-        return "Ошибка генерации"
-
-
 def format_response(text):
     text = re.sub(r'\n\n+', '</p><p>', text.strip())
     return f"<p>{text}</p>"
 
+def generate_response(user_input):
+    if not model:
+        return "Модель не загружена"
+    prompt = f"""Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
+
+Вопрос: {user_input}
+Ответ:"""
+    try:
+        output = model(prompt, max_new_tokens=512, temperature=0.7, top_p=0.9)
+        return format_response(output)
+    except Exception as e:
+        print(f"Ошибка генерации: {e}")
+        return "Ошибка генерации"
 
 @app.route("/")
 def home():
     if 'chat_id' not in session:
         session['chat_id'] = str(uuid.uuid4())
-
     history = get_chat_history(session['chat_id'])
-
     chats = []
     for fname in os.listdir(CHATS_DIR):
         if fname.endswith(".json"):
@@ -103,36 +98,29 @@ def home():
                     "title": h[0]["user"][:30],
                     "date": h[0]["timestamp"]
                 })
-
     return render_template("index.html", history=history, chats=chats)
-
 
 @app.route("/chat", methods=["POST"])
 def chat():
     user_input = request.json.get("message", "")
     if not user_input:
         return jsonify({"error": "Пустой запрос"}), 400
-
     chat_id = session.get("chat_id", str(uuid.uuid4()))
     session["chat_id"] = chat_id
-
     response = generate_response(user_input)
     save_chat_message(chat_id, user_input, response)
     return jsonify({"response": response})
-
 
 @app.route("/new_chat")
 def new_chat():
     session['chat_id'] = str(uuid.uuid4())
     return redirect(url_for("home"))
 
-
 @app.route("/load_chat/<chat_id>")
 def load_chat(chat_id):
     if os.path.exists(os.path.join(CHATS_DIR, f"{chat_id}.json")):
         session["chat_id"] = chat_id
     return redirect(url_for("home"))
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
