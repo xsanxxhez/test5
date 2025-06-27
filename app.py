@@ -8,7 +8,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
 
 MODEL_NAME = os.getenv("MODEL_NAME", "TheBloke/Mistral-7B-Instruct-v0.2-GGUF")
-MODEL_FILE = os.getenv("MODEL_FILE", "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+MODEL_FILE = "/etc/secrets/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
 MODEL_TYPE = os.getenv("MODEL_TYPE", "mistral")
 GPU_LAYERS = int(os.getenv("GPU_LAYERS", 0))
 MODEL_URL = f"https://huggingface.co/{MODEL_NAME}/resolve/main/{MODEL_FILE}"
