@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>NEOCHAT v2.0</title>
+    <style>
+        :root {
+            --neon-pink: #ff2a6d;
+            --neon-blue: #05d9e8;
+            --neon-purple: #d300c5;
+            --neon-green: #00ff9d;
+            --dark-bg: #0d0221;
+            --darker-bg: #070113;
+            --panel-bg: rgba(13, 2, 33, 0.7);
+            --code-bg: #1a1a2e;
+            --glow-blue: 0 0 10px var(--neon-blue);
+            --glow-pink: 0 0 10px var(--neon-pink);
+        }
+
+        body {
+            background: var(--dark-bg);
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            background: var(--darker-bg);
+            border-right: 1px solid var(--neon-purple);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        #chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #header {
+            padding: 15px;
+            border-bottom: 1px solid var(--neon-blue);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #chat-display {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: var(--panel-bg);
+        }
+
+        #input-area {
+            padding: 15px;
+            border-top: 1px solid var(--neon-purple);
+            background: var(--darker-bg);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-title {
+            color: var(--neon-green);
+            font-size: 1.5em;
+            text-shadow: var(--glow-blue);
+            margin: 0;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid var(--neon-purple);
+            color: var(--neon-blue);
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn:hover {
+            background: var(--neon-purple);
+            color: black;
+            box-shadow: var(--glow-pink);
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.4s;
+        }
+
+        .user-message {
+            color: var(--neon-pink);
+            text-shadow: var(--glow-pink);
+        }
+
+        .bot-message {
+            color: var(--neon-blue);
+            text-shadow: var(--glow-blue);
+        }
+
+        .message-content {
+            margin-top: 5px;
+            line-height: 1.6;
+        }
+
+        .message-content p {
+            margin: 10px 0;
+        }
+
+        .message-content ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .message-content li {
+            margin: 5px 0;
+        }
+
+        .code-block {
+            background: var(--code-bg);
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow-x: auto;
+            font-family: 'Consolas', monospace;
+            border-left: 3px solid var(--neon-green);
+        }
+
+        #user-input {
+            flex-grow: 1;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--neon-blue);
+            color: white;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            outline: none;
+        }
+
+        #user-input:focus {
+            border-color: var(--neon-pink);
+            box-shadow: var(--glow-pink);
+        }
+
+        #send-btn {
+            background: var(--neon-blue);
+            color: black;
+            border: none;
+            padding: 0 25px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #send-btn:hover {
+            background: var(--neon-pink);
+            box-shadow: var(--glow-pink);
+        }
+
+        .chat-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid var(--neon-purple);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chat-item:hover {
+            background: rgba(213, 0, 197, 0.1);
+            border-left-color: var(--neon-green);
+        }
+
+        .chat-item.active {
+            background: rgba(5, 217, 232, 0.1);
+            border-left-color: var(--neon-blue);
+        }
+
+        #new-chat-btn {
+            width: 100%;
+            margin-bottom: 20px;
+            background: var(--neon-purple);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .typing-indicator {
+            color: var(--neon-green);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+<div id="sidebar">
+    <button id="new-chat-btn" class="btn" onclick="newChat()">+ Новый чат</button>
+    <div id="chat-list">
+        {% for chat in chats %}
+        <div class="chat-item {% if chat.id == session['chat_id'] %}active{% endif %}"
+             onclick="loadChat('{{ chat.id }}')">
+            {{ chat.title }}
+            <div class="timestamp">{{ chat.date }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="chat-container">
+    <div id="header">
+        <h1 class="chat-title">NEOCHAT v2.0</h1>
+        <div id="status-indicator">● Онлайн</div>
+    </div>
+
+    <div id="chat-display">
+        {% for msg in history %}
+        <div class="message user-message">
+            <strong>Вы:</strong>
+            <div class="message-content">{{ msg.user }}</div>
+            <div class="timestamp">{{ msg.timestamp|datetimeformat }}</div>
+        </div>
+
+        {% if msg.bot %}
+        <div class="message bot-message">
+            <strong>AI:</strong>
+            <div class="message-content">{{ msg.bot|safe }}</div>
+            <div class="timestamp">{{ msg.timestamp|datetimeformat }}</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="Введите сообщение..." autofocus>
+        <button id="send-btn" onclick="sendMessage()">Отправить</button>
+    </div>
+</div>
+
+<script>
+    // Форматирование ответов
+    function formatResponse(text) {
+        // Обработка блоков кода
+        text = text.replace(/```([\s\S]*?)```/g, '<div class="code-block">$1</div>');
+
+        // Обработка списков
+        text = text.replace(/<li>/g, '</p><ul><li>').replace(/<\/li>/g, '</li></ul><p>');
+
+        return text;
+    }
+
+    // Добавление сообщения в чат
+    function addMessage(sender, text, isHistory=false) {
+        const chatDisplay = document.getElementById('chat-display');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}-message`;
+
+        const now = new Date();
+        const timestamp = now.toLocaleString();
+
+        messageDiv.innerHTML = `
+            <strong>${sender === 'user' ? 'Вы' : 'AI'}:</strong>
+            <div class="message-content">${formatResponse(text)}</div>
+            <div class="timestamp">${timestamp}</div>
+        `;
+
+        chatDisplay.appendChild(messageDiv);
+        if (!isHistory) {
+            chatDisplay.scrollTop = chatDisplay.scrollHeight;
+        }
+    }
+
+    // Отправка сообщения
+    async function sendMessage() {
+        const input = document.getElementById('user-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        addMessage('user', message);
+        input.value = '';
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            });
+
+            const data = await response.json();
+            if (data.error) {
+                addMessage('bot', `ERROR: ${data.error}`);
+            } else {
+                addMessage('bot', data.response);
+            }
+        } catch (err) {
+            addMessage('bot', 'NETWORK ERROR: Сбой подключения');
+        }
+    }
+
+    // Создание нового чата
+    function newChat() {
+        window.location.href = '/new_chat';
+    }
+
+    // Загрузка существующего чата
+    function loadChat(chatId) {
+        window.location.href = `/load_chat/${chatId}`;
+    }
+
+    // Отправка по Enter
+    document.getElementById('user-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+
+    // Прокрутка вниз при загрузке
+    window.onload = function() {
+        const chatDisplay = document.getElementById('chat-display');
+        chatDisplay.scrollTop = chatDisplay.scrollHeight;
+    };
+</script>
+</body>
+</html>
