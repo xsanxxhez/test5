@@ -13,7 +13,17 @@ MODEL_FILE = "/etc/secrets/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
 MODEL_TYPE = os.getenv("MODEL_TYPE", "mistral")
 GPU_LAYERS = int(os.getenv("GPU_LAYERS", 0))
 
-
+try:
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_FILE,
+        model_type=MODEL_TYPE,
+        gpu_layers=GPU_LAYERS,
+        context_length=2048
+    )
+except Exception as e:
+    print("Ошибка загрузки модели:", e)
+    model = None
+    
 CHATS_DIR = "chats"
 os.makedirs(CHATS_DIR, exist_ok=True)
 
