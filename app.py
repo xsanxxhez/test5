@@ -38,10 +38,6 @@ def load_model():
 # ⚠️ Запускаем прямо при импорте (до запуска сервера)
 load_model()
 
-@app.before_first_request
-
-    load_model()
-
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format='%d.%m.%Y %H:%M'):
     try:
