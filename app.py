@@ -3,6 +3,7 @@ from ctransformers import AutoModelForCausalLM
 import os, json, re, uuid
 from datetime import datetime
 import requests
+import os
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
@@ -65,10 +66,10 @@ def generate_response(user_input):
     if not model:
         return "Модель не загружена"
 
-    prompt = f'''Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
+    prompt = f"""Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
 
 Вопрос: {user_input}
-Ответ:'''
+Ответ:"""
 
     try:
         output = model(prompt, max_new_tokens=512, temperature=0.7, top_p=0.9)
@@ -127,4 +128,5 @@ def load_chat(chat_id):
     return redirect(url_for("home"))
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
