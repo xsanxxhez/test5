@@ -3,7 +3,6 @@ from ctransformers import AutoModelForCausalLM
 import os, json, re, uuid
 from datetime import datetime
 import requests
-import os
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
@@ -128,5 +127,7 @@ def load_chat(chat_id):
     return redirect(url_for("home"))
 
 if __name__ == "__main__":
+    # Для локальной отладки, запуск сервера Flask на порту из переменной окружения PORT,
+    # чтобы на Render работало корректно
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
