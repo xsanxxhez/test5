@@ -7,10 +7,15 @@ import requests
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
 
-MODEL_FILE = "mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-MODEL_URL = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+MODEL_NAME = os.getenv("MODEL_NAME", "TheBloke/Mistral-7B-Instruct-v0.2-GGUF")
+MODEL_FILE = os.getenv("MODEL_FILE", "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+MODEL_TYPE = os.getenv("MODEL_TYPE", "mistral")
+GPU_LAYERS = int(os.getenv("GPU_LAYERS", 0))
+MODEL_URL = f"https://huggingface.co/{MODEL_NAME}/resolve/main/{MODEL_FILE}"
+
 CHATS_DIR = "chats"
 os.makedirs(CHATS_DIR, exist_ok=True)
+
 
 def download_model():
     if not os.path.exists(MODEL_FILE):
@@ -22,18 +27,19 @@ def download_model():
                     f.write(chunk)
         print("Модель загружена.")
 
-# Загрузка модели
+
 try:
     download_model()
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_FILE,
-        model_type="mistral",
-        gpu_layers=0,
+        model_type=MODEL_TYPE,
+        gpu_layers=GPU_LAYERS,
         context_length=2048
     )
 except Exception as e:
     print("Ошибка загрузки модели:", e)
     model = None
+
 
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format='%d.%m.%Y %H:%M'):
@@ -42,12 +48,14 @@ def datetimeformat(value, format='%d.%m.%Y %H:%M'):
     except:
         return value
 
+
 def get_chat_history(chat_id):
     path = os.path.join(CHATS_DIR, f"{chat_id}.json")
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return []
+
 
 def save_chat_message(chat_id, user_input, response):
     history = get_chat_history(chat_id)
@@ -61,14 +69,15 @@ def save_chat_message(chat_id, user_input, response):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
 
+
 def generate_response(user_input):
     if not model:
         return "Модель не загружена"
 
-    prompt = f"""Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
+    prompt = f'''Ты — дружелюбный ИИ ассистент. Отвечай кратко и по делу.
 
 Вопрос: {user_input}
-Ответ:"""
+Ответ:'''
 
     try:
         output = model(prompt, max_new_tokens=512, temperature=0.7, top_p=0.9)
@@ -77,9 +86,11 @@ def generate_response(user_input):
         print(f"Ошибка генерации: {e}")
         return "Ошибка генерации"
 
+
 def format_response(text):
     text = re.sub(r'\n\n+', '</p><p>', text.strip())
     return f"<p>{text}</p>"
+
 
 @app.route("/")
 def home():
@@ -102,6 +113,7 @@ def home():
 
     return render_template("index.html", history=history, chats=chats)
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
     user_input = request.json.get("message", "")
@@ -115,10 +127,12 @@ def chat():
     save_chat_message(chat_id, user_input, response)
     return jsonify({"response": response})
 
+
 @app.route("/new_chat")
 def new_chat():
     session['chat_id'] = str(uuid.uuid4())
     return redirect(url_for("home"))
+
 
 @app.route("/load_chat/<chat_id>")
 def load_chat(chat_id):
@@ -126,8 +140,7 @@ def load_chat(chat_id):
         session["chat_id"] = chat_id
     return redirect(url_for("home"))
 
+
 if __name__ == "__main__":
-    # Для локальной отладки, запуск сервера Flask на порту из переменной окружения PORT,
-    # чтобы на Render работало корректно
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
