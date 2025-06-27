@@ -39,7 +39,7 @@ def load_model():
 load_model()
 
 @app.before_first_request
-def init():
+
     load_model()
 
 @app.template_filter('datetimeformat')
