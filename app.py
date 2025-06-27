@@ -7,6 +7,7 @@ import requests
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
 
+model = None
 
 MODEL_FILE = "/etc/secrets/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
 MODEL_TYPE = os.getenv("MODEL_TYPE", "mistral")
