@@ -29,11 +29,17 @@ def download_model_if_needed():
 
 # === Инициализация модели ===
 # Загрузка модели
-model = None
+
 def load_model():
     global model
     download_model_if_needed()
-    model = AutoModelForCausalLM.from_pretrained(MODEL_FILE, model_type="mistral", gpu_layers=0)
+   model = AutoModelForCausalLM.from_pretrained(
+    "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
+    model_type="mistral",
+    gpu_layers=0,
+    context_length=1024
+)
+
 
 # ⚠️ Запускаем прямо при импорте (до запуска сервера)
 load_model()
