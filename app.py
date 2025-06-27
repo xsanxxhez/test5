@@ -28,11 +28,15 @@ def download_model_if_needed():
         print("Модель уже скачана.")
 
 # === Инициализация модели ===
+# Загрузка модели
 model = None
 def load_model():
     global model
     download_model_if_needed()
     model = AutoModelForCausalLM.from_pretrained(MODEL_FILE, model_type="mistral", gpu_layers=0)
+
+# ⚠️ Запускаем прямо при импорте (до запуска сервера)
+load_model()
 
 @app.before_first_request
 def init():
